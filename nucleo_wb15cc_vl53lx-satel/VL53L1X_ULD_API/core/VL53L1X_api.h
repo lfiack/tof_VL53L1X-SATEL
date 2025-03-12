@@ -239,7 +239,7 @@ VL53L1X_ERROR VL53L1X_GetInterMeasurementInMs(uint16_t dev, uint16_t * pIM);
 VL53L1X_ERROR VL53L1X_BootState(uint16_t dev, uint8_t *state);
 
 /**
- * @brief This function returns the sensor id, sensor Id must be 0xEEAC
+ * @brief This function returns the sensor id, sensor Id must be 0xEACC
  */
 VL53L1X_ERROR VL53L1X_GetSensorId(uint16_t dev, uint16_t *id);
 

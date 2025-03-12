@@ -28,7 +28,6 @@
 #include <stdio.h>
 
 #include "VL53L1X_api.h"
-#include "VL53L1X_calibration.h"
 #include "vl53l1_error_codes.h"
 /* USER CODE END Includes */
 
@@ -39,7 +38,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define VL53L1X_DEFAULT_ADDRESS (0x29 << 1)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -121,18 +120,19 @@ int main(void)
 	HAL_GPIO_WritePin(XSDN_GPIO_Port, XSDN_Pin, GPIO_PIN_SET);
 	HAL_Delay(10);
 
-	uint8_t byteData;
-	uint16_t wordData;
-	int8_t status;
+	uint16_t id;
+	if (VL53L1X_GetSensorId(VL53L1X_DEFAULT_ADDRESS, &id) != VL53L1_ERROR_NONE)
+	{
+		Error_Handler();
+	}
+	printf("SensorID : 0x%X\r\n", id);
 
-#define VL53L1X_DEFAULT_ADDRESS (0x29 << 1)
-
-	status = VL53L1_RdByte(VL53L1X_DEFAULT_ADDRESS, 0x010F, &byteData);
-	printf("(%d)VL53L1X Model_ID: 0x%X\r\n", status, byteData);
-	status = VL53L1_RdByte(VL53L1X_DEFAULT_ADDRESS, 0x0110, &byteData);
-	printf("(%d)VL53L1X Module_Type: 0x%X\r\n", status, byteData);
-	status = VL53L1_RdWord(VL53L1X_DEFAULT_ADDRESS, 0x010F, &wordData);
-	printf("(%d)VL53L1X: 0x%X\r\n", status, wordData);
+	VL53L1X_Version_t version;
+	if (VL53L1X_GetSWVersion(&version) != VL53L1_ERROR_NONE)
+	{
+		Error_Handler();
+	}
+	printf("Version : %u.%ub%ur%lu\r\n", version.major, version.minor, version.build, version.revision);
 
 	uint8_t boot_state = 0;
 	uint8_t boot_state_counter = 0;
@@ -140,22 +140,44 @@ int main(void)
 	while(boot_state == 0)
 	{
 		boot_state_counter++;
-		status = VL53L1X_BootState(VL53L1X_DEFAULT_ADDRESS, &boot_state);
+		if (VL53L1X_BootState(VL53L1X_DEFAULT_ADDRESS, &boot_state) != VL53L1_ERROR_NONE)
+		{
+			Error_Handler();
+		}
 		HAL_Delay(1);
 	}
 
 	printf("Chip booted in %d...\r\n", boot_state_counter);
 
-	status = VL53L1X_SensorInit(VL53L1X_DEFAULT_ADDRESS);
+	//Loads the 135 bytes default values to initialize the sensor.
+	if (VL53L1X_SensorInit(VL53L1X_DEFAULT_ADDRESS) != VL53L1_ERROR_NONE)
+	{
+		Error_Handler();
+	}
+	printf("Sensor initialized with the default values\r\n");
 
-	status = VL53L1X_SetDistanceMode(VL53L1X_DEFAULT_ADDRESS, 1); // 1=short, 2=long
-	status = VL53L1X_SetInterMeasurementInMs(VL53L1X_DEFAULT_ADDRESS, 200); // in ms, IM must be >= TB
-	status = VL53L1X_SetTimingBudgetInMs(VL53L1X_DEFAULT_ADDRESS, 200); // in ms possible values [20, 50, 100, 200, 500]
+	if (VL53L1X_SetDistanceMode(VL53L1X_DEFAULT_ADDRESS, 1) != VL53L1_ERROR_NONE) // 1=short, limited to 1.3m
+	{
+		Error_Handler();
+	}
+	printf("Short distance mode\r\n");
 
-	printf("vl53l1x parameters set...\r\n");
+	if (VL53L1X_SetTimingBudgetInMs(VL53L1X_DEFAULT_ADDRESS, 50) != VL53L1_ERROR_NONE) // in ms possible values [20, 50, 100, 200, 500]
+	{
+		Error_Handler();
+	}
 
-	status = VL53L1X_StartRanging(VL53L1X_DEFAULT_ADDRESS);
-	uint16_t distance;
+	if (VL53L1X_SetInterMeasurementInMs(VL53L1X_DEFAULT_ADDRESS, 50) != VL53L1_ERROR_NONE) // in ms, IM must be >= TB
+	{
+		Error_Handler();
+	}
+
+	printf("Timing budget set\r\n");
+
+	if (VL53L1X_StartRanging(VL53L1X_DEFAULT_ADDRESS) != VL53L1_ERROR_NONE)
+	{
+		Error_Handler();
+	}
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -165,9 +187,15 @@ int main(void)
 		if (data_available > 0)
 		{
 			data_available = 0;
-
-			status = VL53L1X_GetDistance(VL53L1X_DEFAULT_ADDRESS, &distance);
-			status = VL53L1X_ClearInterrupt(VL53L1X_DEFAULT_ADDRESS);
+			uint16_t distance;
+			if (VL53L1X_ClearInterrupt(VL53L1X_DEFAULT_ADDRESS) != VL53L1_ERROR_NONE)
+			{
+				Error_Handler();
+			}
+			if (VL53L1X_GetDistance(VL53L1X_DEFAULT_ADDRESS, &distance) != VL53L1_ERROR_NONE)
+			{
+				Error_Handler();
+			}
 			printf("distance(%lu) : %u\r\n", measure_counter, distance);
 		}
 
